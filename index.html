@@ -25,6 +25,28 @@
   html { font-size: 15px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  [data-theme='pink'] {
+    --bg: #fce4ec;
+    --surface: #fff0f5;
+    --surface2: #fce4ec;
+    --surface3: #f8bbd0;
+    --border: #f48fb1;
+    --text: #880e4f;
+    --text2: #ad1457;
+    --text3: #e91e8c;
+    --pink: #c2185b;
+    --pink-light: #fce4ec;
+    --pink-xlight: #fff0f5;
+    --pink-border: #f48fb1;
+    --blue: #ad1457;
+    --blue-mid: #c2185b;
+    --blue-light: #f8bbd0;
+    --blue-xlight: #fce4ec;
+    --success: #2e7d32;
+    --error: #b71c1c;
+    --shadow: 0 2px 12px rgba(194,24,91,0.15);
+    --shadow-sm: 0 1px 4px rgba(194,24,91,0.1);
+  }
   [data-theme='dark'] {
     --bg: #0f1117;
     --surface: #1a1d27;
@@ -44,13 +66,19 @@
   }
   body {
     background-color: var(--bg);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%23e0559a' opacity='0.07'%3E✦%3C/text%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='22' fill='%23e0559a' opacity='0.09'%3E✦%3C/text%3E%3C/svg%3E");
     background-repeat: repeat;
+    background-attachment: fixed;
     color: var(--text); font-family: 'Outfit', sans-serif; font-size: 1rem; min-height: 100vh; line-height: 1.6;
   }
   [data-theme='dark'] body {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%23e0559a' opacity='0.05'%3E✦%3C/text%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='22' fill='%23e0559a' opacity='0.06'%3E✦%3C/text%3E%3C/svg%3E");
   }
+  [data-theme='pink'] body {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='22' fill='%23c2185b' opacity='0.1'%3E✦%3C/text%3E%3C/svg%3E");
+  }
+  /* Cards bloqueiam o background */
+  .card, .question-card, header, nav, .modal-content, .modal-overlay > div { background-color: var(--surface); }
   body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='16' fill='%23e0559a' opacity='0.055'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E");
     background-size: 60px 60px; }
@@ -307,7 +335,7 @@
     <div class="mode-badge" id="modeBadge">✦ MODO ADMIN</div>
     <div id="streakBadge" style="display:none;align-items:center;font-size:0.72rem;font-weight:700;color:var(--pink);background:var(--pink-light);border:1px solid var(--pink-border);border-radius:20px;padding:3px 10px;gap:4px"></div>
     <button class="admin-only btn-icon" onclick="location.reload()" title="Atualizar" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:1rem;cursor:pointer;color:var(--text2)">↻</button>
-    <button onclick="toggleDarkMode()" id="btnDark" title="Modo escuro" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;opacity:0.6">🌙</button>
+    <button onclick="toggleDarkMode()" id="btnDark" title="Mudar tema" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;opacity:0.8">🌙</button>
     <button onclick="togglePomodoro()" id="btnPomodoro" title="Pomodoro" style="background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px;opacity:0.6" title="Pomodoro Timer">🍅</button>
     <button onclick="toggleAgua()" id="btnAgua" title="Lembrete de água" style="background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px;opacity:0.6">💧</button>
     <button onclick="abrirPix()" title="Pix pro admin" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;opacity:0.5;font-weight:700;color:var(--blue)" title="Pix">Pix</button>
@@ -1823,8 +1851,12 @@ async function excluirSugestao(idx){
 // DARK MODE
 // ============================================================
 function toggleDarkMode(){
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = cur === 'light' ? 'dark' : cur === 'dark' ? 'pink' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  const btn = document.getElementById('btnDark');
+  if(btn) btn.textContent = next === 'dark' ? '🩷' : next === 'pink' ? '☀️' : '🌙';
+  localStorage.setItem('arisa_theme', next);
   document.getElementById('btnDark').textContent = isDark ? '🌙' : '☀️';
   localStorage.setItem('arisa_theme', isDark ? 'light' : 'dark');
 }
@@ -1832,6 +1864,8 @@ function toggleDarkMode(){
 (()=>{
   const t = localStorage.getItem('arisa_theme') || 'light';
   document.documentElement.setAttribute('data-theme', t);
+  const btnD = document.getElementById('btnDark');
+  if(btnD) btnD.textContent = t === 'dark' ? '🩷' : t === 'pink' ? '☀️' : '🌙';
   const btn = document.getElementById('btnDark');
   if(btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
 })();
