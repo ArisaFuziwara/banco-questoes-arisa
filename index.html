@@ -502,7 +502,7 @@
 </div>
 
 <!-- SUGERIR (usuário) -->
-<div class="tab-content" id="tab-sugerir" style="padding: 24px 16px; max-width: 640px; margin: 0 auto;">
+<div class="tab-content" id="tab-sugerir" style="padding: 24px 16px; max-width: 480px; margin: 0 auto;">
   <div class="page-title">Olá! 🩷</div>
   <p class="page-sub">Aqui você pode mandar uma mensagem pra admin ou gerenciar seu progresso.</p>
 
@@ -1230,36 +1230,65 @@ function responder(qId){
 function renderComentarios(q, prog){
   if(simuladoAtivo) return '';
   const coments = (db.comentarios||{})[q.id] || [];
-  const user = currentUser ? currentUser.nome : 'Anônimo';
   const dataFmt = d => { const dt=new Date(d); return dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
 
-  let histHtml = '';
-  const hist = (db.historico||{})[q.id] || prog; // usa histórico ou prog da sessão
-  if(hist && hist.data){
+  // Histórico: só mostra se respondeu nessa sessão (prog) OU tem histórico
+  const hist = db.progresso[q.id] || (db.historico||{})[q.id];
+  const histHtml = (hist && hist.data) ? (() => {
     const cor = hist.correta ? '✓ Correta' : '✗ Incorreta';
     const corCls = hist.correta ? 'color:var(--success)' : 'color:var(--error)';
-    histHtml = `<div class="historico-box">
+    return `<div class="historico-box" style="margin-bottom:0">
       <div><span class="hist-label">Última resposta</span><br><strong>${hist.resposta||'—'}</strong></div>
       <div><span class="hist-label">Resultado</span><br><span style="${corCls};font-weight:700">${cor}</span></div>
       <div><span class="hist-label">Data</span><br>${dataFmt(hist.data)}</div>
     </div>`;
-  }
+  })() : '';
 
-  const comentHtml = coments.map(c=>`
+  // Comentário do admin (pinned, rosa)
+  const adminComents = coments.filter(c => c.isAdmin);
+  const userComents  = coments.filter(c => !c.isAdmin);
+  const adminHtml = adminComents.map(c=>`
+    <div style="background:var(--pink-xlight);border:1.5px solid var(--pink-border);border-radius:10px;padding:10px 14px;margin-bottom:8px">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--pink);margin-bottom:4px">✦ Comentário do Admin</div>
+      <div style="font-size:0.87rem;color:var(--text);line-height:1.5">${esc(c.texto)}</div>
+    </div>`).join('');
+
+  const userComentHtml = userComents.map(c=>`
     <div class="comentario-item">
       <span class="comentario-autor">${esc(c.autor)}</span>
       <span class="comentario-data">${dataFmt(c.data)}</span>
       <div class="comentario-texto">${esc(c.texto)}</div>
     </div>`).join('');
 
-  return `<div class="comentarios-section">
-    ${histHtml}
-    ${coments.length>0?`<div style="font-size:0.75rem;font-weight:700;color:var(--text3);margin-bottom:6px">COMENTÁRIOS (${coments.length})</div>${comentHtml}`:''}
-    <div class="comentario-input">
-      <textarea id="coment-${q.id}" rows="2" placeholder="Deixe um comentário sobre esta questão..."></textarea>
-      <button class="btn btn-primary" style="padding:8px 14px;font-size:0.82rem;align-self:flex-end" onclick="salvarComentario('${q.id}')">Enviar</button>
-    </div>
-  </div>`;
+  // Botão de comentários colapsável
+  const total = coments.length;
+  const btnLabel = total > 0
+    ? `💬 ${total} comentário${total>1?'s':''}`
+    : '💬 Comentar';
+
+  return `
+    ${histHtml ? `<div style="border-top:1px solid var(--border);padding:10px 16px;background:var(--surface2)">${histHtml}</div>` : ''}
+    ${adminHtml ? `<div style="padding:10px 16px;background:var(--pink-xlight);border-top:1px solid var(--pink-border)">${adminHtml}</div>` : ''}
+    <div style="border-top:1px solid var(--border);padding:6px 14px;background:var(--surface2)">
+      <button onclick="toggleComentarios('${q.id}')" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text3);font-weight:600;padding:4px 0;display:flex;align-items:center;gap:6px">
+        ${btnLabel} <span id="chevComent-${q.id}" style="font-size:0.7rem;transition:transform 0.2s">▼</span>
+      </button>
+      <div id="comentBody-${q.id}" style="display:none;margin-top:8px">
+        ${userComentHtml}
+        <div class="comentario-input">
+          <textarea id="coment-${q.id}" rows="2" placeholder="Deixe um comentário..."></textarea>
+          <button class="btn btn-primary" style="padding:8px 14px;font-size:0.82rem;align-self:flex-end" onclick="salvarComentario('${q.id}')">Enviar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleComentarios(qId){
+  const body = document.getElementById('comentBody-'+qId);
+  const chev = document.getElementById('chevComent-'+qId);
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  chev.style.transform = open ? '' : 'rotate(180deg)';
 }
 
 async function salvarComentario(qId){
@@ -1268,7 +1297,8 @@ async function salvarComentario(qId){
   if(!texto) return;
   if(!db.comentarios) db.comentarios = {};
   if(!db.comentarios[qId]) db.comentarios[qId] = [];
-  db.comentarios[qId].push({ autor: currentUser?.nome||'Anônimo', data: new Date().toISOString(), texto });
+  const isAdmin = currentUser?.slug === ADMIN_SLUG;
+  db.comentarios[qId].push({ autor: currentUser?.nome||'Anônimo', data: new Date().toISOString(), texto, isAdmin });
   // Salva comentários no doc compartilhado (banco/meta-coments)
   try{
     const comentDoc = doc(firestore, 'banco', 'comentarios');
@@ -1759,7 +1789,7 @@ Object.assign(window,{
   copiarLink,compartilharNativo,exportarDados,exportarCSV,baixarModeloCSV,importarCSV,importarDados,
   renderDesempenho,entrarNome,logoutGoogle,verificarNovasQuestoes,toggleFiltros,atualizarFiltrosBadge,
   salvarComentario,enviarSugestao,excluirSugestao,renderSugestoesAdmin,resetarProgressoUsuario,
-  abrirJogoDaVelha,fecharJogo,resetJogo,jogarVelha,
+  abrirJogoDaVelha,fecharJogo,resetJogo,jogarVelha,toggleComentarios,
   togglePomodoro,togglePomodoroTimer,resetPomodoro,
   toggleAgua,abrirPix,copiarChavePix,
 });
