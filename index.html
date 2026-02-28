@@ -24,7 +24,28 @@
   }
   html { font-size: 15px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  [data-theme='dark'] {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --surface3: #2a2f45;
+    --border: #2e3452;
+    --text: #e8eaf6;
+    --text2: #9ba3c7;
+    --text3: #5c6490;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --shadow-sm: 0 1px 6px rgba(0,0,0,0.3);
+    --pink-light: rgba(224,85,154,0.15);
+    --pink-xlight: rgba(224,85,154,0.08);
+    --pink-border: rgba(224,85,154,0.3);
+    --blue-xlight: rgba(67,97,238,0.1);
+    --blue-light: rgba(67,97,238,0.25);
+  }
   body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 1rem; min-height: 100vh; line-height: 1.6; }
+  body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='16' fill='%23e0559a' opacity='0.055'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E");
+    background-size: 60px 60px; }
 
   header { padding: 0 32px; height: 68px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 100; box-shadow: var(--shadow-sm); }
   .logo { display: flex; align-items: center; gap: 10px; }
@@ -142,6 +163,13 @@
     border-left: 4px solid var(--blue); border-radius: 12px;
     padding: 14px 16px 14px 16px; box-shadow: var(--shadow);
     max-width: 280px; display: none; animation: slideInRight 0.3s ease;
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%     { transform: translateX(-6px); }
+    40%     { transform: translateX(6px); }
+    60%     { transform: translateX(-4px); }
+    80%     { transform: translateX(4px); }
   }
   @keyframes slideInRight {
     from { transform: translateX(40px); opacity: 0; }
@@ -269,7 +297,9 @@
       <span class="scaler-label" style="font-size:1.2em;font-weight:700">A</span>
     </div>
     <div class="mode-badge" id="modeBadge">✦ MODO ADMIN</div>
+    <div id="streakBadge" style="display:none;align-items:center;font-size:0.72rem;font-weight:700;color:var(--pink);background:var(--pink-light);border:1px solid var(--pink-border);border-radius:20px;padding:3px 10px;gap:4px"></div>
     <button class="admin-only btn-icon" onclick="location.reload()" title="Atualizar" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:1rem;cursor:pointer;color:var(--text2)">↻</button>
+    <button onclick="toggleDarkMode()" id="btnDark" title="Modo escuro" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;opacity:0.6">🌙</button>
     <button onclick="togglePomodoro()" id="btnPomodoro" title="Pomodoro" style="background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px;opacity:0.6" title="Pomodoro Timer">🍅</button>
     <button onclick="toggleAgua()" id="btnAgua" title="Lembrete de água" style="background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px;opacity:0.6">💧</button>
     <button onclick="abrirPix()" title="Pix pro admin" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;opacity:0.5;font-weight:700;color:var(--blue)" title="Pix">Pix</button>
@@ -680,6 +710,7 @@ async function iniciarSessao(usuario){
   renderResolver();
   renderCadastro();
   renderInserirSelects();
+  mostrarStreak();
   // Notifica usuário não-admin sobre novas questões
   if(currentUser && currentUser.slug !== ADMIN_SLUG){
     verificarNovasQuestoes();
@@ -1190,6 +1221,7 @@ function renderQuestoes(){
 function selecionarResposta(qId,letra){
   if(!simuladoAtivo&&db.progresso[qId])return;
   selectedAnswers[qId]=letra;
+  playSound('select');
   document.getElementById('qcard-'+qId).querySelectorAll('.alt-option').forEach(el=>el.classList.remove('selected'));
   document.getElementById(`alt-${qId}-${letra}`).classList.add('selected');
   const hint=document.getElementById('ansHint-'+qId);if(hint)hint.style.display='none';
@@ -1216,6 +1248,8 @@ function responder(qId){
   salvar();
   const card=document.getElementById('qcard-'+qId);
   card.classList.remove('answered-correct','answered-wrong');card.classList.add(correta?'answered-correct':'answered-wrong');
+  if(correta){ const r=card.getBoundingClientRect(); spawnSparkle(r.left+r.width/2,r.top+r.height/2); playSound('correct'); }
+  else{ shakeCard(qId); playSound('wrong'); }
   q.alternativas.forEach(alt=>{
     const el=document.getElementById(`alt-${qId}-${alt.letra}`);el.classList.remove('selected');
     if(alt.letra===q.gabarito)el.classList.add('correct','disabled');
@@ -1777,6 +1811,105 @@ async function excluirSugestao(idx){
   }catch(e){}
 }
 
+// ============================================================
+// DARK MODE
+// ============================================================
+function toggleDarkMode(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('btnDark').textContent = isDark ? '🌙' : '☀️';
+  localStorage.setItem('arisa_theme', isDark ? 'light' : 'dark');
+}
+// Apply saved theme on load
+(()=>{
+  const t = localStorage.getItem('arisa_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('btnDark');
+  if(btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+})();
+
+// ============================================================
+// STREAK DE ESTUDOS
+// ============================================================
+function calcularStreak(){
+  const chave = 'arisa_streak_' + (currentUser?.slug||'anon');
+  const hoje = new Date().toDateString();
+  const dados = JSON.parse(localStorage.getItem(chave) || '{"streak":0,"ultimo":""}');
+  const ontem = new Date(Date.now()-86400000).toDateString();
+  if(dados.ultimo === hoje) return dados.streak;
+  if(dados.ultimo === ontem){ dados.streak++; }
+  else if(dados.ultimo !== hoje){ dados.streak = 1; }
+  dados.ultimo = hoje;
+  localStorage.setItem(chave, JSON.stringify(dados));
+  return dados.streak;
+}
+function mostrarStreak(){
+  const streak = calcularStreak();
+  if(streak < 1) return;
+  const emoji = streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '✨';
+  const el = document.getElementById('streakBadge');
+  if(el){ el.textContent = `${emoji} ${streak} dia${streak>1?'s':''}`; el.style.display='inline-flex'; }
+}
+
+// ============================================================
+// SONS
+// ============================================================
+function playSound(type){
+  try{
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if(type==='select'){
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.08);
+      osc.start(); osc.stop(ctx.currentTime+0.08);
+    } else if(type==='correct'){
+      // acorde bonito
+      [523,659,784].forEach((f,i)=>{
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.frequency.value=f;
+        g.gain.setValueAtTime(0.12,ctx.currentTime+i*0.07);
+        g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.07+0.35);
+        o.start(ctx.currentTime+i*0.07);o.stop(ctx.currentTime+i*0.07+0.35);
+      });
+    } else if(type==='wrong'){
+      osc.frequency.value = 220;
+      osc.type = 'sawtooth';
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.25);
+      osc.start(); osc.stop(ctx.currentTime+0.25);
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// ANIMAÇÃO ✦ voando (acerto) + shake (erro)
+// ============================================================
+function spawnSparkle(x, y){
+  for(let i=0;i<6;i++){
+    const el = document.createElement('div');
+    el.textContent = '✦';
+    el.style.cssText = `position:fixed;left:${x}px;top:${y}px;font-size:${14+Math.random()*14}px;color:var(--pink);pointer-events:none;z-index:9999;transition:all 0.8s ease-out;opacity:1;`;
+    document.body.appendChild(el);
+    const angle = (Math.PI*2/6)*i;
+    const dist = 50+Math.random()*60;
+    requestAnimationFrame(()=>{
+      el.style.transform = `translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist-40}px) rotate(${Math.random()*360}deg) scale(0)`;
+      el.style.opacity = '0';
+    });
+    setTimeout(()=>el.remove(), 900);
+  }
+}
+function shakeCard(qId){
+  const card = document.getElementById('qcard-'+qId);
+  if(!card) return;
+  card.style.animation = 'shake 0.4s ease';
+  setTimeout(()=>card.style.animation='', 450);
+}
+
 init();
 
 Object.assign(window,{
@@ -1789,7 +1922,7 @@ Object.assign(window,{
   copiarLink,compartilharNativo,exportarDados,exportarCSV,baixarModeloCSV,importarCSV,importarDados,
   renderDesempenho,entrarNome,logoutGoogle,verificarNovasQuestoes,toggleFiltros,atualizarFiltrosBadge,
   salvarComentario,enviarSugestao,excluirSugestao,renderSugestoesAdmin,resetarProgressoUsuario,
-  abrirJogoDaVelha,fecharJogo,resetJogo,jogarVelha,toggleComentarios,
+  abrirJogoDaVelha,fecharJogo,resetJogo,jogarVelha,toggleDarkMode,playSound,spawnSparkle,shakeCard,mostrarStreak,toggleComentarios,
   togglePomodoro,togglePomodoroTimer,resetPomodoro,
   toggleAgua,abrirPix,copiarChavePix,
 });
